@@ -84,12 +84,20 @@ class Inferencer(object):
         return
 
     def inference_from_path(self):
-        src_mel, _ = get_spectrograms(self.args.source)
-        tar_mel, _ = get_spectrograms(self.args.target)
-        src_mel = torch.from_numpy(self.normalize(src_mel)).cuda()
+        # src_mel, _ = get_spectrograms(self.args.source)
+        # tar_mel, _ = get_spectrograms(self.args.target)
+        src_data = pickle.load(self.args.source)
+        tar_data = pickle.load(self.args.target)
+        tar_mel = None
+        for cnt, (_, tar_mell) in enumerate(tar_data.items()):
+            if cnt >= 1:
+                break
+            tar_mel = tar_mell
         tar_mel = torch.from_numpy(self.normalize(tar_mel)).cuda()
-        conv_wav, conv_mel = self.inference_one_utterance(src_mel, tar_mel)
-        self.write_wav_to_file(conv_wav, self.args.output)
+        for cnt, (pth, src_mel) in enumerate(src_data.items()):
+            src_mel = torch.from_numpy(self.normalize(src_mel)).cuda()
+            conv_wav, conv_mel = self.inference_one_utterance(src_mel, tar_mel)
+            self.write_wav_to_file(conv_wav, os.path.join(self.args.output, f'{cnt}.wav'))
         return
 
 if __name__ == '__main__':
