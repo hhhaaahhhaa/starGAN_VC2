@@ -101,6 +101,8 @@ class Inferencer(object):
             # src_mel = src_mel.detach().cpu().numpy()
             # tar_mel = tar_mel.detach().cpu().numpy()
             src_mel = torch.from_numpy(self.normalize(src_mel)).cuda()
+            if cnt >= 10:
+                break
         # conv_wav, conv_mel = self.inference_one_utterance(src_mel, tar_mel)
             conv_wav, conv_mel = self.inference_one_utterance(src_mel, tar_mel)
             self.write_wav_to_file(conv_wav, os.path.join(self.args.output, f'{cnt}.wav'))
