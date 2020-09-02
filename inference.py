@@ -83,7 +83,7 @@ class Inferencer(object):
         write(output_path, rate=self.args.sample_rate, data=wav_data)
         return
 
-   def inference_from_path(self):
+    def inference_from_path(self):
         # src_mel, _ = get_spectrograms(self.args.source)
         # tar_mel, _ = get_spectrograms(self.args.target)
         src_data, tar_data = None, None
@@ -96,7 +96,7 @@ class Inferencer(object):
             if cnt >= 1:
                 break
             tar_mel = tar_mell
-            tar_mel = torch.from_numpy(self.normalize(tar_mel)).cuda()
+        tar_mel = torch.from_numpy(self.normalize(tar_mel)).cuda()
         for cnt, (pth, src_mel) in enumerate(src_data.items()):
             # src_mel = src_mel.detach().cpu().numpy()
             # tar_mel = tar_mel.detach().cpu().numpy()
