@@ -84,28 +84,32 @@ class Inferencer(object):
         return
 
     def inference_from_path(self):
-        # src_mel, _ = get_spectrograms(self.args.source)
-        # tar_mel, _ = get_spectrograms(self.args.target)
+        """
+        src_mel, _ = get_spectrograms(self.args.source)
+        tar_mel, _ = get_spectrograms(self.args.target)
+        src_mel = torch.from_numpy(self.normalize(src_mel)).cuda()
+        tar_mel = torch.from_numpy(self.normalize(tar_mel)).cuda()
+        conv_wav, conv_mel = self.inference_one_utterance(src_mel, tar_mel)
+        self.write_wav_to_file(conv_wav, self.args.output)
+        """
         src_data, tar_data = None, None
         with open(self.args.source, 'rb') as f:
             src_data = pickle.load(f)
         with open(self.args.target, 'rb') as f:
             tar_data = pickle.load(f)
         tar_mel = None
-        for cnt, (_, tar_mell) in enumerate(tar_data.items()):
+        for cnt, (pth, tar_mell) in enumerate(tar_data.items()):
             if cnt >= 1:
                 break
             tar_mel = tar_mell
-        tar_mel = torch.from_numpy(self.normalize(tar_mel)).cuda()
+        tar_mel = torch.from_numpy(tar_mel).cuda()
         for cnt, (pth, src_mel) in enumerate(src_data.items()):
-            # src_mel = src_mel.detach().cpu().numpy()
-            # tar_mel = tar_mel.detach().cpu().numpy()
-            src_mel = torch.from_numpy(self.normalize(src_mel)).cuda()
+            src_mel = torch.from_numpy(src_mel).cuda()
             if cnt >= 10:
                 break
-        # conv_wav, conv_mel = self.inference_one_utterance(src_mel, tar_mel)
             conv_wav, conv_mel = self.inference_one_utterance(src_mel, tar_mel)
-            self.write_wav_to_file(conv_wav, os.path.join(self.args.output, f'{cnt}.wav'))
+            self.write_wav_to_file(conv_wav, os.path.join(self.args.output, pth + f'{cnt}.wav'))
+        
         return
 
 if __name__ == '__main__':
