@@ -38,8 +38,8 @@ class Solver(object):
 
     def save_model(self, iteration):
         # save model and discriminator and their optimizer
-        torch.save(self.model.state_dict(), f'{self.args.store_model_path}.ckpt')
-        torch.save(self.opt.state_dict(), f'{self.args.store_model_path}.opt')
+        torch.save(self.model.state_dict(), f'{self.args.store_model_path}_{iteration}.ckpt')
+        torch.save(self.opt.state_dict(), f'{self.args.store_model_path}_{iteration}.opt')
 
     def save_config(self):
         with open(f'{self.args.store_model_path}.config.yaml', 'w') as f:
