@@ -50,3 +50,5 @@ lambda:
     lambda_rec: 10
     lambda_kl: 1
 annealing_iters: 20000
+n_critics: 5
+base_gen_path: model_upload/vctk_model_199999.ckpt

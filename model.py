@@ -393,3 +393,51 @@ class AE(nn.Module):
     def get_speaker_embeddings(self, x):
         emb = self.speaker_encoder(x)
         return emb
+
+
+class Eps(nn.Module):
+    def __init__(self, config):
+        super(Eps, self).__init__()
+        self.speaker_encoder = SpeakerEncoder(**config['SpeakerEncoder'])
+        self.content_encoder = ContentEncoder(**config['ContentEncoder'])
+        self.decoder = Decoder(**config['Decoder'])
+
+    def forward(self, x, x_cond):
+        emb = self.speaker_encoder(x_cond)
+        mu, _ = self.content_encoder(x)
+        dec = self.decoder(mu, emb)
+        return dec
+
+
+class Discriminator(nn.Module):
+    def __init__(selfself, config):
+        super(Discriminator, self).__init__()
+        self.emb = SpeakerEncoder(**config['SpeakerEncoder'])
+        self.fc = nn.Sequential(
+            nn.Linear(128, 1),
+            nn.tanh(),
+        )
+    def forward(self, x):
+        x = self.emb(x)
+        score = self.fc(x)
+
+        return score
+
+
+class Generator(nn.Module):
+    def __init__(self, config):
+        super(Generator, self).__init__()
+        self.base_generator = AE(config)
+        self.eps_generator = Eps(config)
+        self.config = config
+
+    def load_base_generator(self):
+        print(f'Load model from {self.config.base_gen_path}')
+        self.base_generator.load_state_dict(torch.load(self.config.base_gen_path))
+        return
+
+    def forward(self, src, trg):
+        x = self.base_generator.inference(src, tag)
+        eps = self.eps_generator.inference(src, tag)
+
+        return x + eps

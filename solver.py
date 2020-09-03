@@ -1,12 +1,14 @@
 import torch
 import numpy as np
 import sys
-import os 
+import os
+import time
+from datetime import datetime, timedelta
 import torch.nn as nn
 import torch.nn.functional as F
 import yaml
 import pickle
-from model import AE
+from model import Generator, Discriminator
 from data_utils import get_data_loader
 from data_utils import PickleDataset
 from utils import *
@@ -38,8 +40,8 @@ class Solver(object):
 
     def save_model(self, iteration):
         # save model and discriminator and their optimizer
-        torch.save(self.model.state_dict(), f'{self.args.store_model_path}_{iteration}.ckpt')
-        torch.save(self.opt.state_dict(), f'{self.args.store_model_path}_{iteration}.opt')
+        torch.save(self.G.state_dict(), os.path.join(self.args.store_model_dir, f'G_{iteration}.ckpt'))
+        torch.save(self.D.state_dict(), os.path.join(self.args.store_model_dir, f'D_{iteration}.ckpt'))
 
     def save_config(self):
         with open(f'{self.args.store_model_path}.config.yaml', 'w') as f:
@@ -69,13 +71,21 @@ class Solver(object):
 
     def build_model(self): 
         # create model, discriminator, optimizers
-        self.model = cc(AE(self.config))
-        print(self.model)
+        # self.model = cc(AE(self.config))
+        self.G = cc(Generator(self.config))
+        self.D = cc(Discriminator(self.config))
+        self.G.load_base_generator()
+        print(self.G)
+        print(self.D)
         optimizer = self.config['optimizer']
-        self.opt = torch.optim.Adam(self.model.parameters(), 
+        self.opt_G = torch.optim.Adam(self.G.parameters(),
                 lr=optimizer['lr'], betas=(optimizer['beta1'], optimizer['beta2']), 
                 amsgrad=optimizer['amsgrad'], weight_decay=optimizer['weight_decay'])
-        print(self.opt)
+
+        self.opt_D = torch.optim.Adam(self.D.parameters(),
+                lr=optimizer['lr'], betas=(optimizer['beta1'], optimizer['beta2']),
+                amsgrad=optimizer['amsgrad'], weight_decay=optimizer['weight_decay'])
+        print(self.opt_G)
         return
 
     def ae_step(self, data, lambda_kl):
@@ -97,13 +107,100 @@ class Solver(object):
         return meta
 
     def train(self, n_iterations):
+        print('Start training......')
+        start_time = datetime.now()
+        loss = {}
         for iteration in range(n_iterations):
-            if iteration >= self.config['annealing_iters']:
-                lambda_kl = self.config['lambda']['lambda_kl']
-            else:
-                lambda_kl = self.config['lambda']['lambda_kl'] * (iteration + 1) / self.config['annealing_iters'] 
-            data = next(self.train_iter)
-            meta = self.ae_step(data, lambda_kl)
+
+            # Prepare data
+            x_real = next(self.train_iter)
+            x_real = cc(x_real)
+            rand_idx = torch.randperm(x_real.size(0))
+            x_trg = x_real[rand_idx]
+
+            # Train discriminator
+            self.reset_grad()
+            x_fake = self.G(x_real, x_trg)
+
+            # Compute loss
+            out_r = self.D(x_real)
+            out_f = self.D(x_fake)
+            d_loss_t = F.binary_cross_entropy_with_logits(input=out_f,
+                                                          target=torch.zeros_like(out_f, dtype=torch.float)) + \
+                       F.binary_cross_entropy_with_logits(input=out_r, target=torch.ones_like(out_r, dtype=torch.float))
+
+            # Compute loss for gradient penalty.
+            alpha = cc(torch.rand(x_real.size(0), 1, 1))
+            x_hat = (alpha * x_real.data + (1 - alpha) * x_fake.data).requires_grad_(True)
+            out_src = self.D(x_hat, label_trg)
+            d_loss_gp = self.gradient_penalty(out_src, x_hat)
+
+            d_loss = d_loss_t + 5 * d_loss_gp
+
+            self.reset_grad()
+            d_loss.backward()
+            grad_norm = torch.nn.utils.clip_grad_norm_(self.D.parameters(),
+                    max_norm=self.config['optimizer']['grad_norm'])
+            self.opt_D.step()
+
+            # loss['D/d_loss_t'] = d_loss_t.item()
+            # loss['D/loss_cls'] = d_loss_cls.item()
+            # loss['D/D_gp'] = d_loss_gp.item()
+            loss['D/D_loss'] = d_loss.item()
+
+            if n_iterations >= 5000:
+                # Train generator
+                for _ in range(self.config.n_critics):
+
+                    # Original-to-target domain.
+                    x_fake = self.G(x_real, x_trg)
+                    g_out_src = self.D(x_fake)
+                    g_loss_fake = F.binary_cross_entropy_with_logits(input=g_out_src,
+                                                                     target=torch.ones_like(g_out_src, dtype=torch.float))
+                    # Target-to-original domain. (Cycle Loss)
+                    x_reconst = self.G(x_fake, x_real)
+                    g_loss_rec = F.l1_loss(x_reconst, x_real)
+
+                    # Original-to-Original domain. (Identity Loss)
+                    x_fake_iden = self.G(x_real, x_real)
+                    id_loss = F.l1_loss(x_fake_iden, x_real)
+
+                    # Backward and optimize.
+                    g_loss = g_loss_fake + self.lambda_cycle * g_loss_rec + \
+                             self.lambda_identity * id_loss
+
+                    self.reset_grad()
+                    g_loss.backward()
+                    grad_norm = torch.nn.utils.clip_grad_norm_(self.G.parameters(),
+                            max_norm=self.config['optimizer']['grad_norm'])
+                    self.opt_G.step()
+
+                    # Logging.
+                    loss['G/loss_fake'] = g_loss_fake.item()
+                    loss['G/loss_rec'] = g_loss_rec.item()
+                    loss['G/loss_cls'] = g_loss_cls.item()
+                    loss['G/loss_id'] = id_loss.item()
+                    loss['G/g_loss'] = g_loss.item()
+
+                """
+                if iteration >= self.config['annealing_iters']:
+                    lambda_kl = self.config['lambda']['lambda_kl']
+                else:
+                    lambda_kl = self.config['lambda']['lambda_kl'] * (iteration + 1) / self.config['annealing_iters'] 
+                data = next(self.train_iter)
+                meta = self.ae_step(data, lambda_kl)
+                """
+
+            # Training Info
+            if (iteration + 1) % self.args.log_step == 0:
+                et = datetime.now() - start_time
+                et = str(et)[:-7]
+                log = "Elapsed [{}], Iteration [{}/{}]".format(et, iteration + 1, n_iterations)
+                for tag, value in loss.items():
+                    log += ", {}: {:.4f}".format(tag, value)
+                print(log)
+
+            """
             # add to logger
             if iteration % self.args.summary_steps == 0:
                 self.logger.scalars_summary(f'{self.args.tag}/ae_train', meta, iteration)
@@ -115,5 +212,29 @@ class Solver(object):
             if (iteration + 1) % self.args.save_steps == 0 or iteration + 1 == n_iterations:
                 self.save_model(iteration=iteration)
                 print()
+            """
+
+            if (iteration + 1) % self.args.save_steps == 0 or iteration + 1 == n_iterations:
+                self.save_model(iteration=iteration)
+                print()
+
         return
 
+    def gradient_penalty(self, y, x):
+        """Compute gradient penalty: (L2_norm(dy/dx) - 1)**2."""
+        weight = torch.ones(y.size()).to(self.device)
+        dydx = torch.autograd.grad(outputs=y,
+                                   inputs=x,
+                                   grad_outputs=weight,
+                                   retain_graph=True,
+                                   create_graph=True,
+                                   only_inputs=True)[0]
+
+        dydx = dydx.view(dydx.size(0), -1)
+        dydx_l2norm = torch.sqrt(torch.sum(dydx ** 2, dim=1))
+        return torch.mean((dydx_l2norm - 1) ** 2)
+
+    def reset_grad(self):
+        """Reset the gradient buffers."""
+        self.opt_G.zero_grad()
+        self.opt_G.zero_grad()
