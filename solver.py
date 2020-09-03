@@ -40,13 +40,13 @@ class Solver(object):
 
     def save_model(self, iteration):
         # save model and discriminator and their optimizer
-        torch.save(self.G.state_dict(), os.path.join(self.args.store_model_dir, f'G_{iteration}.ckpt'))
-        torch.save(self.D.state_dict(), os.path.join(self.args.store_model_dir, f'D_{iteration}.ckpt'))
+        torch.save(self.G.state_dict(), os.path.join(self.args.store_model_path, f'G_{iteration}.ckpt'))
+        torch.save(self.D.state_dict(), os.path.join(self.args.store_model_path, f'D_{iteration}.ckpt'))
 
     def save_config(self):
-        with open(f'{self.args.store_model_path}.config.yaml', 'w') as f:
+        with open(f'{self.args.store_model_path}' + '/config.yaml', 'w') as f:
             yaml.dump(self.config, f)
-        with open(f'{self.args.store_model_path}.args.yaml', 'w') as f:
+        with open(f'{self.args.store_model_path}' + '/args.yaml', 'w') as f:
             yaml.dump(vars(self.args), f)
         return
 
@@ -72,6 +72,7 @@ class Solver(object):
     def build_model(self): 
         # create model, discriminator, optimizers
         # self.model = cc(AE(self.config))
+        # print(self.config)
         self.G = cc(Generator(self.config))
         self.D = cc(Discriminator(self.config))
         self.G.load_base_generator()
@@ -119,38 +120,42 @@ class Solver(object):
             x_trg = x_real[rand_idx]
 
             # Train discriminator
-            self.reset_grad()
-            x_fake = self.G(x_real, x_trg)
+            for _ in range(5):
+              self.reset_grad()
+              x_fake = self.G(x_real, x_trg)
 
-            # Compute loss
-            out_r = self.D(x_real)
-            out_f = self.D(x_fake)
-            d_loss_t = F.binary_cross_entropy_with_logits(input=out_f,
-                                                          target=torch.zeros_like(out_f, dtype=torch.float)) + \
-                       F.binary_cross_entropy_with_logits(input=out_r, target=torch.ones_like(out_r, dtype=torch.float))
+              # Compute loss
+              out_r = self.D(x_real)
+              out_f = self.D(x_fake)
+              # print(out_r[:5])
+              # print(out_f[:5])
 
-            # Compute loss for gradient penalty.
-            alpha = cc(torch.rand(x_real.size(0), 1, 1))
-            x_hat = (alpha * x_real.data + (1 - alpha) * x_fake.data).requires_grad_(True)
-            out_src = self.D(x_hat, label_trg)
-            d_loss_gp = self.gradient_penalty(out_src, x_hat)
+              d_loss_t = F.binary_cross_entropy_with_logits(input=out_f, target=torch.zeros_like(out_r, dtype=torch.float)) + \
+                        F.binary_cross_entropy_with_logits(input=out_r, target=torch.ones_like(out_r, dtype=torch.float))
 
-            d_loss = d_loss_t + 5 * d_loss_gp
+              # Compute loss for gradient penalty.
+              alpha = cc(torch.rand(x_real.size(0), 1, 1))
+              x_hat = (alpha * x_real.data + (1 - alpha) * x_fake.data).requires_grad_(True)
+              out_src = self.D(x_hat)
+              d_loss_gp = self.gradient_penalty(out_src, x_hat)
+              
+              # print(d_loss_t, d_loss_gp)
+              d_loss = d_loss_t
 
-            self.reset_grad()
-            d_loss.backward()
-            grad_norm = torch.nn.utils.clip_grad_norm_(self.D.parameters(),
-                    max_norm=self.config['optimizer']['grad_norm'])
-            self.opt_D.step()
+              self.reset_grad()
+              d_loss.backward()
+              grad_norm = torch.nn.utils.clip_grad_norm_(self.D.parameters(),
+                      max_norm=self.config['optimizer']['grad_norm'])
+              self.opt_D.step()
 
-            # loss['D/d_loss_t'] = d_loss_t.item()
-            # loss['D/loss_cls'] = d_loss_cls.item()
-            # loss['D/D_gp'] = d_loss_gp.item()
-            loss['D/D_loss'] = d_loss.item()
+              # loss['D/d_loss_t'] = d_loss_t.item()
+              # loss['D/loss_cls'] = d_loss_cls.item()
+              # loss['D/D_gp'] = d_loss_gp.item()
+              loss['D/D_loss'] = d_loss.item()
 
-            if n_iterations >= 5000:
+            if iteration >= 0:
                 # Train generator
-                for _ in range(self.config.n_critics):
+                for _ in range(self.config['n_critics']):
 
                     # Original-to-target domain.
                     x_fake = self.G(x_real, x_trg)
@@ -166,8 +171,8 @@ class Solver(object):
                     id_loss = F.l1_loss(x_fake_iden, x_real)
 
                     # Backward and optimize.
-                    g_loss = g_loss_fake + self.lambda_cycle * g_loss_rec + \
-                             self.lambda_identity * id_loss
+                    g_loss = g_loss_fake + self.config['lambda']['lambda_cycle'] * g_loss_rec + \
+                             self.config['lambda']['lambda_id'] * id_loss
 
                     self.reset_grad()
                     g_loss.backward()
@@ -178,7 +183,6 @@ class Solver(object):
                     # Logging.
                     loss['G/loss_fake'] = g_loss_fake.item()
                     loss['G/loss_rec'] = g_loss_rec.item()
-                    loss['G/loss_cls'] = g_loss_cls.item()
                     loss['G/loss_id'] = id_loss.item()
                     loss['G/g_loss'] = g_loss.item()
 
@@ -222,7 +226,7 @@ class Solver(object):
 
     def gradient_penalty(self, y, x):
         """Compute gradient penalty: (L2_norm(dy/dx) - 1)**2."""
-        weight = torch.ones(y.size()).to(self.device)
+        weight = cc(torch.ones(y.size()))
         dydx = torch.autograd.grad(outputs=y,
                                    inputs=x,
                                    grad_outputs=weight,
