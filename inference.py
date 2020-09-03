@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import yaml
 import pickle
-from model import AE
+from model import Generator
 from utils import *
 from functools import reduce
 import json
@@ -46,7 +46,8 @@ class Inferencer(object):
 
     def build_model(self): 
         # create model, discriminator, optimizers
-        self.model = cc(AE(self.config))
+        self.model = cc(Generator(self.config))
+        self.model.load_base_generator()
         print(self.model)
         self.model.eval()
         return
@@ -62,7 +63,7 @@ class Inferencer(object):
     def inference_one_utterance(self, x, x_cond):
         x = self.utt_make_frames(x)
         x_cond = self.utt_make_frames(x_cond)
-        dec = self.model.inference(x, x_cond)
+        dec = self.model(x, x_cond)
         dec = dec.transpose(1, 2).squeeze(0)
         dec = dec.detach().cpu().numpy()
         dec = self.denormalize(dec)
@@ -84,7 +85,7 @@ class Inferencer(object):
         return
 
     def inference_from_path(self):
-        """
+        
         src_mel, _ = get_spectrograms(self.args.source)
         tar_mel, _ = get_spectrograms(self.args.target)
         src_mel = torch.from_numpy(self.normalize(src_mel)).cuda()
@@ -109,7 +110,7 @@ class Inferencer(object):
                 break
             conv_wav, conv_mel = self.inference_one_utterance(src_mel, tar_mel)
             self.write_wav_to_file(conv_wav, os.path.join(self.args.output, pth + f'{cnt}.wav'))
-        
+        """
         return
 
 if __name__ == '__main__':
