@@ -49,6 +49,8 @@ optimizer:
 lambda:
     lambda_rec: 10
     lambda_kl: 1
+    lambda_cycle: 3
+    lambda_id: 2
 annealing_iters: 20000
-n_critics: 5
-base_gen_path: model_upload/vctk_model_199999.ckpt
+n_critics: 1
+base_gen_path: 'model_upload/vctk_model_199999.ckpt'
