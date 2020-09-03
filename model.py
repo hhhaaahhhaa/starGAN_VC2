@@ -410,18 +410,16 @@ class Eps(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(selfself, config):
+    def __init__(self, config):
         super(Discriminator, self).__init__()
         self.emb = SpeakerEncoder(**config['SpeakerEncoder'])
-        self.fc = nn.Sequential(
-            nn.Linear(128, 1),
-            nn.tanh(),
-        )
+        self.fc = nn.Linear(128, 1)
+    
     def forward(self, x):
         x = self.emb(x)
-        score = self.fc(x)
+        x = self.fc(x)
 
-        return score
+        return x
 
 
 class Generator(nn.Module):
@@ -432,12 +430,12 @@ class Generator(nn.Module):
         self.config = config
 
     def load_base_generator(self):
-        print(f'Load model from {self.config.base_gen_path}')
-        self.base_generator.load_state_dict(torch.load(self.config.base_gen_path))
+        print(f"Load model from {self.config['base_gen_path']}")
+        self.base_generator.load_state_dict(torch.load(self.config['base_gen_path']))
         return
 
     def forward(self, src, trg):
-        x = self.base_generator.inference(src, tag)
-        eps = self.eps_generator.inference(src, tag)
+        x = self.base_generator.inference(src, trg)
+        eps = self.eps_generator(src, trg)
 
         return x + eps
