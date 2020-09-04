@@ -434,6 +434,10 @@ class Generator(nn.Module):
         self.base_generator.load_state_dict(torch.load(self.config['base_gen_path']))
         return
 
+    def init_param(self):
+        for param in self.base_generator.parameters():
+          param.requires_grad = False
+
     def forward(self, src, trg):
         x = self.base_generator.inference(src, trg)
         eps = self.eps_generator(src, trg)
