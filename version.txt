@@ -1,0 +1,14 @@
+Version History
+
+version 0:
+GAN, pretrained model not fixed
+
+version 0.1 from 0
+pretrained model fixed
+
+version 0.2 from 0.1
+change to WGAN-GP
+
+version 0.3 from 0.1
+add training task to generator
+
