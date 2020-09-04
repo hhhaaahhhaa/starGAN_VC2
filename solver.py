@@ -113,6 +113,8 @@ class Solver(object):
         start_time = datetime.now()
         loss = {}
         for iteration in range(n_iterations):
+            n_gen = 5
+            n_dis = 5
 
             # Prepare data
             x_real = next(self.train_iter)
@@ -121,15 +123,13 @@ class Solver(object):
             x_trg = x_real[rand_idx]
 
             # Train discriminator
-            for _ in range(5):
+            for _ in range(n_dis):
               self.reset_grad()
               x_fake = self.G(x_real, x_trg)
 
               # Compute loss
               out_r = self.D(x_real)
               out_f = self.D(x_fake)
-              # print(out_r[:5])
-              # print(out_f[:5])
 
               d_loss_t = F.binary_cross_entropy_with_logits(input=out_f, target=torch.zeros_like(out_r, dtype=torch.float)) + \
                         F.binary_cross_entropy_with_logits(input=out_r, target=torch.ones_like(out_r, dtype=torch.float))
@@ -155,9 +155,12 @@ class Solver(object):
               loss['D/D_loss'] = d_loss.item()
 
             if iteration >= 0:
+                
+                lambda_f = 0.0
                 # Train generator
-                for _ in range(self.config['n_critics']):
-
+                for j in range(self.config['n_critics'] + n_gen):
+                    if j > n_gen:
+                        lambda_f = 1.0       
                     # Original-to-target domain.
                     x_fake = self.G(x_real, x_trg)
                     g_out_src = self.D(x_fake)
@@ -172,7 +175,7 @@ class Solver(object):
                     id_loss = F.l1_loss(x_fake_iden, x_real)
 
                     # Backward and optimize.
-                    g_loss = g_loss_fake + self.config['lambda']['lambda_cycle'] * g_loss_rec + \
+                    g_loss = lambda_f * g_loss_fake + self.config['lambda']['lambda_cycle'] * g_loss_rec + \
                              self.config['lambda']['lambda_id'] * id_loss
 
                     self.reset_grad()
