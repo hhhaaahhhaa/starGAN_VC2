@@ -159,7 +159,7 @@ class Solver(object):
                 lambda_f = 0.0
                 # Train generator
                 for j in range(self.config['n_critics'] + n_gen):
-                    if j > n_gen:
+                    if j >= n_gen:
                         lambda_f = 1.0       
                     # Original-to-target domain.
                     x_fake = self.G(x_real, x_trg)
