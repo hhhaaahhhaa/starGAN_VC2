@@ -18,7 +18,7 @@ if __name__ == '__main__':
     parser.add_argument('-load_model_path', default='/storage/model/adaptive_vc/model')
     parser.add_argument('-log_step', default=10, type=int)
     parser.add_argument('-summary_steps', default=100, type=int)
-    parser.add_argument('-save_steps', default=400, type=int)
+    parser.add_argument('-save_steps', default=200, type=int)
     parser.add_argument('-tag', '-t', default='init')
     parser.add_argument('-iters', default=0, type=int)
 
