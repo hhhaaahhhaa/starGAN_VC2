@@ -440,6 +440,6 @@ class Generator(nn.Module):
 
     def forward(self, src, trg):
         x = self.base_generator.inference(src, trg)
-        eps = self.eps_generator(src, trg)
+        eps = self.eps_generator(x, trg)
 
         return x + eps
