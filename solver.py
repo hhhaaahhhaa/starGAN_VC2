@@ -87,6 +87,7 @@ class Solver(object):
                 lr=optimizer['lr'], betas=(optimizer['beta1'], optimizer['beta2']),
                 amsgrad=optimizer['amsgrad'], weight_decay=optimizer['weight_decay'])
         print(self.opt_G)
+        self.G.init_param()
         return
 
     def ae_step(self, data, lambda_kl):
