@@ -53,4 +53,4 @@ lambda:
     lambda_id: 2
 annealing_iters: 20000
 n_critics: 1
-base_gen_path: 'model_upload/vctk_model_199999.ckpt'
+base_gen_path: 'model_upload/vctk_model_209999.ckpt'

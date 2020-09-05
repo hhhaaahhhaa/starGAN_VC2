@@ -109,7 +109,7 @@ class Inferencer(object):
 
         for i, (src_mel, tar_mel) in enumerate(zip(src_mel_list, tar_mel_list)):
             conv_wav, conv_mel = self.inference_one_utterance(src_mel, tar_mel)
-            self.write_wav_to_file(conv_wav, os.path.join(self.args.output, GAN + f'_{i}.wav'))
+            self.write_wav_to_file(conv_wav, os.path.join(self.args.output, 'GAN' + f'_{i}.wav'))
 
         return
 
