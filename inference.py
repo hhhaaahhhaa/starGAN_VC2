@@ -85,7 +85,7 @@ class Inferencer(object):
         return
 
     def inference_from_path(self):
-        
+        """
         src_mel, _ = get_spectrograms(self.args.source)
         tar_mel, _ = get_spectrograms(self.args.target)
         src_mel = torch.from_numpy(self.normalize(src_mel)).cuda()
@@ -98,19 +98,19 @@ class Inferencer(object):
             src_data = pickle.load(f)
         with open(self.args.target, 'rb') as f:
             tar_data = pickle.load(f)
-        tar_mel = None
-        for cnt, (pth, tar_mell) in enumerate(tar_data.items()):
-            if cnt >= 1:
-                break
-            tar_mel = tar_mell
-        tar_mel = torch.from_numpy(tar_mel).cuda()
-        for cnt, (pth, src_mel) in enumerate(src_data.items()):
-            src_mel = torch.from_numpy(src_mel).cuda()
-            if cnt >= 10:
-                break
+        src_mel_list = []
+        tar_mel_list = []
+        src_list = ['p276_374.wav', 'p276_374.wav', 'p278_343.wav', 'p237_132.wav']
+        tar_list = ['p292_035.wav', 'p228_333.wav', 'p310_127.wav', 'p292_256.wav']
+        for pth in src_list:
+            src_mel_list.append(torch.from_numpy(src_data[pth]).cuda())
+        for pth in tar_list:
+            tar_mel_list.append(torch.from_numpy(tar_data[pth]).cuda())
+
+        for i, (src_mel, tar_mel) in enumerate(zip(src_mel_list, tar_mel_list)):
             conv_wav, conv_mel = self.inference_one_utterance(src_mel, tar_mel)
-            self.write_wav_to_file(conv_wav, os.path.join(self.args.output, pth + f'{cnt}.wav'))
-        """
+            self.write_wav_to_file(conv_wav, os.path.join(self.args.output, GAN + f'_{i}.wav'))
+
         return
 
 if __name__ == '__main__':
